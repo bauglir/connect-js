@@ -233,8 +233,7 @@ angular.module('anvil', [])
           ;
 
         now.setTime(exp);
-        document.cookie = 'anvil.connect=' + secret
-                        + '; expires=' + now.toUTCString();
+        localStorage['anvil.secret'] = JSON.stringify({ value: secret, expires: now });
 
         var encrypted = sjcl.encrypt(secret, JSON.stringify(Anvil.session));
         localStorage['anvil.connect'] = encrypted;
@@ -251,18 +250,24 @@ angular.module('anvil', [])
       function deserialize () {
         var re, secret, json, parsed;
 
-        try {
-          // Use the cookie value to decrypt the session in localStorage
-          re      = new RegExp('[; ]anvil.connect=([^\\s;]*)');
-          secret  = document.cookie.match(re).pop();
-          json    = sjcl.decrypt(secret, localStorage['anvil.connect']);
-          parsed  = JSON.parse(json);
+        // LocalStorage Way
+        session = {};
+        if(angular.isDefined(localStorage['anvil.secret'])) {
+          secret = JSON.parse(localStorage['anvil.secret']);
 
-        } catch (e) {
-          console.log('Cannot deserialize session data');
+          // As long as the expiration date is in the future, try to decode the
+          // session
+          if((new Date() - new Date(secret.expires)) <= 0) {
+            if(angular.isDefined(localStorage['anvil.connect'])) {
+              json = sjcl.decrypt(secret.value, localStorage['anvil.connect']);
+              session = JSON.parse(json);
+            }
+          } else {
+            delete localStorage['anvil.secret'];
+          }
         }
+        Anvil.session = session;
 
-        Anvil.session = session = parsed || {};
         //console.log('DESERIALIZED', session);
       };
 
